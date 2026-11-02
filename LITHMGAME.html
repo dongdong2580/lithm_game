@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>4키 리듬게임</title>
+<style>
+:root{--bg:#f3f4f8;--fg:#1c1d2b;--card:#fff;--bd:#d6d8e4;--ac:#5b5bf0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12131c;--fg:#e8e9f5;--card:#1d1f2e;--bd:#33364d;--ac:#8484ff}}
+:root[data-theme="dark"]{--bg:#12131c;--fg:#e8e9f5;--card:#1d1f2e;--bd:#33364d;--ac:#8484ff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#menu{max-width:520px;margin:0 auto;padding:18px;overflow-y:auto;height:100%}
+h1{font-size:22px;margin:4px 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:14px;margin:0 0 10px;opacity:.7}
+label.f{display:block;border:1.5px dashed var(--bd);border-radius:10px;padding:12px;margin-bottom:8px;font-size:14px;cursor:pointer}
+label.f.ok{border-color:var(--ac);border-style:solid}
+input[type=file]{display:none}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:14px}
+.row input[type=range]{flex:1}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+button{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:10px;padding:10px;cursor:pointer}
+button.k{font-weight:700;font-size:18px}button.k.wait{border-color:var(--ac);color:var(--ac)}
+button.main{background:var(--ac);color:#fff;border:0;width:100%;font-size:17px;padding:14px;font-weight:700}
+button:disabled{opacity:.4}
+.ov{position:fixed;inset:0;background:var(--bg);display:none;z-index:20;overflow:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 18px 18px}.ovc{max-width:520px;margin:0 auto}
+.map{display:block;width:100%;text-align:left;margin-bottom:8px}.map small{display:block;opacity:.7;margin-top:2px}#pulse{width:120px;height:120px;border-radius:50%;background:var(--ac);margin:30px auto;opacity:.25}
+.dens{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.dens button{padding:8px 0}.dens button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+select{font:inherit;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:6px}
+#msg{font-size:13px;opacity:.75;min-height:18px;margin:6px 0}
+#game{position:fixed;inset:0;display:none;background:#0b0c14;touch-action:none;overscroll-behavior:none}
+#gr{position:absolute;top:calc(78px + env(safe-area-inset-top,0px));right:12px;color:#fff;font-weight:800;text-align:right;pointer-events:none}
+canvas{width:100%;height:100%;display:block;touch-action:none}
+#hud{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:0;right:0;display:flex;justify-content:space-between;padding:0 12px;color:#fff;font-weight:700;pointer-events:none}
+#quit{position:absolute;top:calc(40px + env(safe-area-inset-top,0px));right:10px;padding:6px 12px;background:#ffffff22;color:#fff;border:0}
+#res{position:absolute;inset:0;background:#000c;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:17px;text-align:center}
+#res b{font-size:34px}#res button{width:200px}
+</style></head><body>
+<div id="menu">
+<h1>🎵 4키 리듬게임</h1>
+<div class="card"><h2>파일</h2>
+<label class="f" id="lx">🎼 악보 선택 (.musicxml / .xml)<input type="file" id="fx" accept=".musicxml,.xml,text/xml"></label>
+<label class="f" id="la">🎧 음악 선택 (.mp3)<input type="file" id="fa" accept="audio/*,.mp3"></label>
+<div id="msg">악보와 mp3를 모두 선택하세요. (압축 .mxl은 지원하지 않아요)</div></div>
+<button id="om" style="width:100%;margin-bottom:12px">🏆 공식맵</button>
+<div class="card"><h2>설정</h2>
+<div class="row">노트 속도<input type="range" id="sp" min="200" max="1600" step="50" value="700"><span id="spv">700</span></div>
+<div class="row">싱크 보정<input type="range" id="of" min="-300" max="300" step="5" value="0"><span id="ofv">0ms</span></div>
+<button id="cal" style="width:100%">🥁 박자에 맞춰 싱크 자동 보정</button>
+<div style="font-size:14px;margin:8px 0 4px">노트 수 (타일 배율)</div><div class="dens" id="dens"></div>
+<div class="row">동시타격 최대<select id="ms"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+<label class="row"><input type="checkbox" id="lg"> 롱노트 포함</label>
+<label class="row"><input type="checkbox" id="nf"> 죽음 무시 (No Fail) — 정확도가 70% 미만이어도 계속 진행</label>
+<h2 style="margin-top:14px">키 설정 (누르고 → 원하는 키 입력)</h2>
+<div class="keys" id="keys"></div>
+<div style="font-size:12px;opacity:.65;margin-top:6px">모바일은 화면의 레인을 직접 터치하세요.</div></div>
+<button class="main" id="go" disabled>시작</button>
+</div>
+<div id="game"><canvas id="cv"></canvas>
+<div id="hud"><span id="sc">0</span><span id="cb"></span></div>
+<button id="quit">나가기</button><div id="gr"></div>
+<div id="res"></div></div>
+<div id="ov" class="ov"><div class="ovc"><h2 id="ovt"></h2><div id="ovb"></div><button id="ovx" style="width:100%;margin-top:10px">닫기</button></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const COL=['#ff5d8f','#ffb74d','#4dd0e1','#9575ff'];
+const DENS=[['1/4',0.25],['1/3',1/3],['1/2',0.5],['1×',1],['2×',2],['3×',3],['4×',4]];
+let cfg={speed:700,offset:0,keys:['KeyD','KeyF','KeyJ','KeyK'],dens:1,maxSim:2,long:true};
+try{Object.assign(cfg,JSON.parse(localStorage.getItem('r4cfg')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('r4cfg',JSON.stringify(cfg))}catch(e){}};
+const kn=c=>c.replace(/^Key|^Digit/,'').replace('Arrow','').replace('Semicolon',';').replace('Space','␣');
+let raw=[],notes=[],audio=new Audio(),audioURL=null,remap=-1,hasX=false,hasA=false;
+$('sp').value=cfg.speed;$('of').value=cfg.offset;$('nf').checked=!!cfg.nofail;$('nf').onchange=e=>{cfg.nofail=e.target.checked;save()};
+$('ms').onchange=e=>{cfg.maxSim=+e.target.value;save();rebuild()};$('lg').onchange=e=>{cfg.long=e.target.checked;save();rebuild()};
+function ui(){$('spv').textContent=cfg.speed;$('ofv').textContent=cfg.offset+'ms';
+ $('keys').innerHTML='';cfg.keys.forEach((k,i)=>{const b=document.createElement('button');b.className='k'+(remap===i?' wait':'');b.textContent=remap===i?'…':kn(k);b.style.borderBottom='4px solid '+COL[i];b.onclick=()=>{remap=i;ui()};$('keys').appendChild(b)});
+ $('go').disabled=!(hasX&&hasA);
+ $('dens').innerHTML='';DENS.forEach(([n,v])=>{const b=document.createElement('button');b.textContent=n;b.className=Math.abs(cfg.dens-v)<1e-6?'on':'';b.onclick=()=>{cfg.dens=v;save();rebuild();ui()};$('dens').appendChild(b)});
+ $('ms').value=cfg.maxSim;$('lg').checked=cfg.long}
+$('sp').oninput=e=>{cfg.speed=+e.target.value;save();ui()};
+$('of').oninput=e=>{cfg.offset=+e.target.value;save();ui()};
+ui();
+
+// ---------- MusicXML → notes ----------
+function parseXML(txt){
+ const doc=new DOMParser().parseFromString(txt,'text/xml');
+ if(doc.querySelector('parsererror'))throw new Error('XML을 읽을 수 없어요');
+ const parts=[...doc.querySelectorAll('part')];
+ if(!parts.length)throw new Error('악보(part)를 찾지 못했어요');
+ const tempos=[],ev=[];
+ const STEP={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+ for(const part of parts){
+  let cur=0,last=0,div=1;
+  for(const m of part.children){ if(m.localName!=='measure')continue;
+   for(const el of m.children){const n=el.localName;
+    if(n==='attributes'){const d=el.querySelector('divisions');if(d)div=+d.textContent||1}
+    else if(n==='direction'||n==='sound'){const s=n==='sound'?el:el.querySelector('sound[tempo]');
+      if(s&&s.getAttribute('tempo'))tempos.push({b:cur,bpm:+s.getAttribute('tempo')})}
+    else if(n==='backup')cur-=(+el.querySelector('duration').textContent||0)/div;
+    else if(n==='forward')cur+=(+el.querySelector('duration').textContent||0)/div;
+    else if(n==='note'){
+     const dEl=el.querySelector('duration');const dur=dEl?(+dEl.textContent||0)/div:0;
+     const chord=!!el.querySelector('chord');const onset=chord?last:cur;
+     if(!chord){last=cur;cur+=dur}
+     if(el.querySelector('grace')||el.querySelector('rest'))continue;
+     if(el.querySelector('tie[type="stop"]')&&!el.querySelector('tie[type="start"]'))continue;
+     if(el.querySelector('tie[type="stop"]'))continue;
+     const p=el.querySelector('pitch');if(!p)continue;
+     const al=p.querySelector('alter');
+     const midi=12*(+p.querySelector('octave').textContent+1)+STEP[p.querySelector('step').textContent]+(al?+al.textContent:0);
+     ev.push({b:onset,p:midi,d:dur});
+    }}}}
+ if(!ev.length)throw new Error('음표를 찾지 못했어요');
+ tempos.sort((a,b)=>a.b-b.b);
+ if(!tempos.length)tempos.push({b:0,bpm:120});
+ if(tempos[0].b>0)tempos.unshift({b:0,bpm:tempos[0].bpm});
+ const toSec=b=>{let s=0,pb=0,bpm=tempos[0].bpm;
+  for(const t of tempos){if(t.b>=b)break;if(t.b>pb){s+=(t.b-pb)*60/bpm;pb=t.b}bpm=t.bpm}
+  return s+(b-pb)*60/bpm};
+ // 같은 시각의 음을 묶어 원본 이벤트로 반환 (레인 배분은 build에서)
+ const g=new Map();
+ ev.forEach(e=>{const k=Math.round(e.b*960);if(!g.has(k))g.set(k,{b:e.b,ps:[]});g.get(k).ps.push({p:e.p,d:e.d})});
+ return [...g.values()].sort((a,b)=>a.b-b.b).map(o=>({t:toSec(o.b),ps:o.ps.map(x=>({p:x.p,e:toSec(o.b+x.d)}))}));
+}
+function build(){
+ if(!raw.length){notes=[];return}
+ const d=cfg.dens;let G=raw;
+ if(d<1){const n=Math.round(1/d);G=G.filter((_,i)=>i%n===0)}
+ // 음높이 분위수로 4레인 균등 분배 (같은 음은 같은 레인)
+ const all=G.flatMap(g=>g.ps),cnt={};all.forEach(x=>cnt[x.p]=(cnt[x.p]||0)+1);
+ const lane={};let cum=0;
+ Object.keys(cnt).map(Number).sort((a,b)=>a-b).forEach(p=>{lane[p]=Math.min(3,Math.floor((cum+cnt[p]/2)/all.length*4));cum+=cnt[p]});
+ const out=[],M=cfg.maxSim;
+ G.forEach((g,i)=>{
+  const m=new Map();g.ps.forEach(x=>{const l=lane[x.p];m.set(l,Math.max(m.get(l)||g.t,x.e))});
+  let ls=[...m.keys()].sort((a,b)=>a-b);
+  if(ls.length>M){const a=ls;ls=M===1?[a[a.length-1]]:Array.from({length:M},(_,k)=>a[Math.round(k*(a.length-1)/(M-1))])}
+  ls.forEach(l=>{const e=m.get(l);out.push({t:g.t,l,e:cfg.long&&e-g.t>=0.3?e:g.t,hit:false})});
+  const nx=G[i+1];
+  if(d>1&&nx){const gap=nx.t-g.t,k=Math.min(d-1,Math.floor(gap/0.1)-1);
+   for(let j=1;j<=k;j++){const src=(j%2?g:nx).ps[0],tt=g.t+gap*j/(k+1);out.push({t:tt,l:lane[src.p],e:tt,x:1,hit:false})}}
+ });
+ out.sort((a,b)=>a.t-b.t||(a.x?1:0)-(b.x?1:0));
+ const lastT=[-9,-9,-9,-9],prev=[null,null,null,null],res=[];
+ out.forEach(n=>{const l=n.l,p=prev[l];
+  if(n.t-lastT[l]<0.07)return;
+  if(p&&p.e>n.t-0.05){if(n.x)return;p.e=n.t-0.1;if(p.e-p.t<0.3)p.e=p.t}
+  lastT[l]=n.t;prev[l]=n;res.push(n)});
+ notes=res;
+}
+function rebuild(){if(!hasX)return;build();const c=[0,0,0,0];notes.forEach(n=>c[n.l]++);$('msg').textContent='✔ 노트 '+notes.length+'개 (레인별 '+c.join(' / ')+')'}
+$('fx').onchange=async e=>{const f=e.target.files[0];if(!f)return;hasX=false;
+ try{raw=parseXML(await f.text());build();hasX=true;$('lx').classList.add('ok');
+  const c=[0,0,0,0];notes.forEach(n=>c[n.l]++);
+  $('msg').textContent='✔ '+f.name+' — 노트 '+notes.length+'개 (레인별 '+c.join(' / ')+')'}
+ catch(err){$('msg').textContent='⚠ '+err.message;$('lx').classList.remove('ok')}ui()};
+$('fa').onchange=e=>{const f=e.target.files[0];if(!f)return;
+ if(audioURL)URL.revokeObjectURL(audioURL);audioURL=URL.createObjectURL(f);audio.src=audioURL;
+ hasA=true;$('la').classList.add('ok');$('la').firstChild.textContent='🎧 '+f.name;ui()};
+
+// ---------- Game ----------
+const cv=$('cv'),cx=cv.getContext('2d');
+let W,H,LX,LW,HY,running=false,lead=0,started=false,lanes,ptr,score,combo,maxc,judge,flash,fx,last=0,done=false,hp=100,hold=[null,null,null,null],down=[0,0,0,0];
+function resize(){const d=devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*d;cv.height=H*d;cx.setTransform(d,0,0,d,0,0);
+ LW=Math.min(W,520)/4;LX=(W-LW*4)/2;HY=H*0.8}
+addEventListener('resize',resize);
+function start(){
+ resize();lanes=[[],[],[],[]];notes.forEach(n=>{n.hit=false;n.hold=false;lanes[n.l].push(n)});
+ ptr=[0,0,0,0];hp=100;hold=[null,null,null,null];down=[0,0,0,0];score=0;combo=0;maxc=0;judge={P:0,G:0,O:0,M:0};flash=[0,0,0,0];fx=null;done=false;
+ $('res').style.display='none';$('menu').style.display='none';$('game').style.display='block';
+ audio.pause();audio.currentTime=0;lead=-2;started=false;lastv=-9;ca=0;cp=performance.now();running=true;last=performance.now();requestAnimationFrame(loop)}
+let ca=0,cp=0,lastv=-9;
+const now=()=>{let v;if(!started)v=lead;else{const t=audio.currentTime,p=performance.now();if(t!==ca){ca=t;cp=p}v=ca+((audio.paused||ca===0)?0:(p-cp)/1000)}if(v<lastv&&lastv-v<0.05)v=lastv;lastv=v;return v+cfg.offset/1000};
+function press(l){if(!running||done)return;down[l]=1;flash[l]=1;
+ const T=now(),n=lanes[l][ptr[l]];const d=n?Math.abs(n.t-T):9;if(d>0.15){if(started){judge.M++;combo=0;fx={t:'MISS',c:'#ff6b6b',a:1};hurt()}return}
+ n.hit=true;ptr[l]++;hp=Math.min(100,hp+1);if(n.e>n.t){n.hold=true;hold[l]=n}
+ const j=d<=0.05?'P':d<=0.1?'G':'O';judge[j]++;score+=j==='P'?1:j==='G'?0.7:0.4;if(j==='O')combo=0;else{combo++;maxc=Math.max(maxc,combo)}
+ fx={t:j==='P'?'PERFECT':j==='G'?'GREAT':'GOOD',c:j==='P'?'#ffe66d':j==='G'?'#7dffb0':'#8ec5ff',a:1}}
+const GR=[[97.5,'SSS','#ffd54a'],[95,'SS','#ffb74d'],[92.5,'S','#ff9966'],[90,'A','#7dffb0'],[85,'B','#6ec1ff'],[80,'C','#b49cff'],[75,'D','#c0c4d6'],[70,'E','#9aa0b5'],[0,'F','#ff6b6b']];
+const jt=()=>judge.P+judge.G+judge.O+judge.M;
+function accu(){const j=jt();return j?score/j:1}
+function grade(){if(!jt())return['-','#fff'];const a=accu()*100;if(a>=99.999)return['Perfect Clear','#fff35c'];const g=GR.find(x=>a>=x[0]);return[g[1],g[2]]}
+function release(l){down[l]=0}
+addEventListener('blur',()=>{for(let i=0;i<4;i++)down[i]=0});
+addEventListener('contextmenu',e=>{if(running)e.preventDefault()});
+function hurt(){if(jt()>=10&&accu()<0.7&&!cfg.nofail&&!done)finish(true)}
+function finish(f){done=true;running=false;audio.pause();
+ const acc=accu();
+ $('res').innerHTML=`<div>${f?'FAILED 💀':'RESULT'}${cfg.nofail?' · NO FAIL':''}</div><div style="font-size:${!f&&grade()[0].length>3?40:56}px;font-weight:800;color:${f?'#ff6b6b':grade()[1]}">${f?'F':grade()[0]}</div><b>${Math.round(acc*1e6).toLocaleString()}</b><div>정확도 ${(acc*100).toFixed(1)}% · 최대 콤보 ${maxc}</div><div>PERFECT ${judge.P} · GREAT ${judge.G} · GOOD ${judge.O} · MISS ${judge.M}</div><button id="rt">다시하기</button><button id="bk">메뉴</button>`;
+ $('res').style.display='flex';$('rt').onclick=start;$('bk').onclick=quit}
+function quit(){running=false;audio.pause();$('game').style.display='none';$('menu').style.display='block'}
+$('quit').onclick=quit;
+function loop(ts){if(!running)return;const dt=(ts-last)/1000;last=ts;
+ if(!started){lead+=dt;if(lead>=0){started=true;audio.play().catch(()=>{});}}
+ const T=now();
+ for(let l=0;l<4;l++){const a=lanes[l];while(a[ptr[l]]&&a[ptr[l]].t<T-0.15){ptr[l]++;judge.M++;combo=0;fx={t:'MISS',c:'#ff6b6b',a:1};hurt(8)}}
+ for(let l=0;l<4;l++){const n=hold[l];if(!n)continue;
+ if(T>=n.e-0.02){n.hold=false;hold[l]=null;combo++;maxc=Math.max(maxc,combo);hp=Math.min(100,hp+3)}
+ else if(!down[l]){n.hold=false;hold[l]=null;if(T<n.e-0.12){combo=0;score=Math.max(0,score-0.4);judge.M++;fx={t:'BREAK',c:'#ff6b6b',a:1};hurt(6)}else hp=Math.min(100,hp+3)}
+ else flash[l]=1}
+ hurt();draw(T);
+ const end=notes.length?notes[notes.length-1].t:0;
+ if(!done&&started&&(audio.ended||T>end+2.5))finish();
+ if(running)requestAnimationFrame(loop)}
+function body(l,y1,y2,on){cx.fillStyle=COL[l]+(on?'dd':'66');y1=Math.max(y1,-50);cx.fillRect(LX+l*LW+16,y1,LW-32,y2-y1)}
+function draw(T){
+ cx.fillStyle='#0b0c14';cx.fillRect(0,0,W,H);
+ for(let l=0;l<4;l++){const x=LX+l*LW;
+  cx.fillStyle=l%2?'#ffffff08':'#ffffff0f';cx.fillRect(x,0,LW,H);
+  if(flash[l]>0){const g=cx.createLinearGradient(0,HY-H*.4,0,HY);g.addColorStop(0,'#0000');g.addColorStop(1,COL[l]+Math.round(flash[l]*90).toString(16).padStart(2,'0'));cx.fillStyle=g;cx.fillRect(x,HY-H*.4,LW,H*.4);flash[l]=Math.max(0,flash[l]-0.06)}
+  cx.fillStyle='#ffffff20';cx.fillRect(x,0,1,H)}
+ cx.fillRect(LX+LW*4,0,1,H);
+ cx.fillStyle='#fff';cx.fillRect(LX,HY-2,LW*4,4);
+ for(let l=0;l<4;l++){const x=LX+l*LW;cx.fillStyle=COL[l]+'55';cx.fillRect(x+4,HY+8,LW-8,H-HY-8);
+  cx.fillStyle='#fff';cx.font='bold 16px system-ui';cx.textAlign='center';cx.fillText(kn(cfg.keys[l]),x+LW/2,HY+34)}
+ for(let l=0;l<4;l++){const a=lanes[l];const hn=hold[l];if(hn)body(l,HY-(hn.e-T)*cfg.speed,HY,1);for(let i=ptr[l];i<a.length;i++){const n=a[i];const y=HY-(n.t-T)*cfg.speed;const ye=n.e>n.t?HY-(n.e-T)*cfg.speed:y;if(y<-30)break;if(n.e>n.t)body(l,ye,y,0);
+  if(y>H+30)continue;cx.fillStyle=COL[l];cx.beginPath();cx.roundRect(LX+l*LW+5,y-12,LW-10,24,8);cx.fill()}}
+ $('sc').textContent=Math.round(score/Math.max(1,notes.length)*1e6).toLocaleString();
+ if(combo>0){cx.textAlign='center';cx.fillStyle='#ffffffaa';cx.font='bold 16px system-ui';cx.fillText('Combo',W/2,64);cx.fillStyle='#fff';cx.font='bold 48px system-ui';cx.fillText(combo,W/2,110)}
+ {const [gl,gc]=grade();$('gr').innerHTML='<div style="font-size:'+(gl.length>3?18:32)+'px;color:'+gc+'">'+gl+'</div><div style="font-size:13px">'+(accu()*100).toFixed(2)+'%</div>'}
+ if(fx&&fx.a>0){cx.globalAlpha=fx.a;cx.fillStyle=fx.c;cx.font='bold 26px system-ui';cx.textAlign='center';cx.fillText(fx.t,W/2,HY-H*.2);cx.globalAlpha=1;fx.a-=0.025}
+ if(!started){cx.fillStyle='#fff';cx.font='bold 40px system-ui';cx.textAlign='center';cx.fillText(Math.ceil(-lead),W/2,H*.4)}}
+
+// ---------- Input ----------
+addEventListener('keydown',e=>{
+ if(remap>=0){e.preventDefault();if(e.code!=='Escape'){const dup=cfg.keys.indexOf(e.code);if(dup>=0&&dup!==remap)cfg.keys[dup]=cfg.keys[remap];cfg.keys[remap]=e.code;save()}remap=-1;ui();return}
+ if(e.repeat||!running)return;if(e.code==='Escape'){quit();return}
+ const l=cfg.keys.indexOf(e.code);if(l>=0){e.preventDefault();press(l)}});
+cv.addEventListener('pointerdown',e=>{e.preventDefault();
+ const l=Math.floor((e.clientX-LX)/LW);if(l>=0&&l<4){pm[e.pointerId]=l;try{cv.setPointerCapture(e.pointerId)}catch(_){}press(l)}});
+const pm={};const pu=e=>{const l=pm[e.pointerId];if(l!==undefined){release(l);delete pm[e.pointerId]}};
+cv.addEventListener('pointerup',pu);cv.addEventListener('pointercancel',pu);
+addEventListener('keyup',e=>{const l=cfg.keys.indexOf(e.code);if(l>=0)release(l)});
+// ---------- 오버레이 / 싱크 보정 / 공식맵 ----------
+const ov=$('ov');let ac=null,cal=null;
+function openOv(t,h){$('ovt').textContent=t;$('ovb').innerHTML=h;ov.style.display='block'}
+function closeCal(){if(cal){clearInterval(cal.iv);cal.osc.forEach(o=>{try{o.stop()}catch(_){}});cal=null}}
+$('ovx').onclick=()=>{closeCal();ov.style.display='none'};
+$('cal').onclick=()=>{
+ ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();
+ openOv('🥁 싱크 보정','<p>메트로놈 소리에 맞춰 화면을 터치(또는 아무 키)하세요. 첫 두 박은 연습이고, 8번 이상 치면 적용할 수 있어요.</p><div id="pulse"></div><div id="cs" style="text-align:center;font-size:20px;font-weight:700">-</div><div class="row"><button id="ca" style="flex:1" disabled>적용</button><button id="cr" style="flex:1">다시</button></div>');
+ const IV=600,t0=ac.currentTime+0.8,clk0=performance.now()-ac.currentTime*1000+t0*1000,osc=[];
+ for(let k=0;k<40;k++){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=k%4?800:1200;g.gain.setValueAtTime(0.3,t0+k*IV/1000);g.gain.exponentialRampToValueAtTime(0.001,t0+k*IV/1000+0.06);o.connect(g);g.connect(ac.destination);o.start(t0+k*IV/1000);o.stop(t0+k*IV/1000+0.08);osc.push(o)}
+ cal={diffs:[],osc,clk0,iv:setInterval(()=>{const p=performance.now()-clk0;$('pulse').style.opacity=p>0&&p%IV<100?0.9:0.25},30)};
+ $('cr').onclick=()=>{closeCal();$('cal').click()};
+ $('ca').onclick=()=>{const m=calMed();cfg.offset=Math.max(-300,Math.min(300,Math.round(-m/5)*5));$('of').value=cfg.offset;save();ui();closeCal();ov.style.display='none'};
+};
+const calMed=()=>{const a=[...cal.diffs].sort((x,y)=>x-y);return a[Math.floor(a.length/2)]};
+function calTap(){if(!cal)return;const p=performance.now()-cal.clk0;if(p<1200)return;
+ const d=((p%600)+600)%600>300?((p%600)+600)%600-600:((p%600)+600)%600;
+ cal.diffs.push(d);if(cal.diffs.length>16)cal.diffs.shift();
+ $('cs').textContent='평균 '+calMed().toFixed(0)+'ms · '+cal.diffs.length+'회';$('ca').disabled=cal.diffs.length<8}
+ov.addEventListener('pointerdown',e=>{if(cal&&!e.target.closest('button'))calTap()});
+addEventListener('keydown',e=>{if(cal&&!e.repeat){e.preventDefault();calTap()}});
+
+function loadMap(m){
+ m.xml().then(t=>{raw=parseXML(t);build();hasX=true;
+  if(audioURL){URL.revokeObjectURL(audioURL);audioURL=null}
+  audio.src=m.src;hasA=true;$('lx').classList.add('ok');$('la').classList.add('ok');$('lx').firstChild.textContent='🎼 '+m.name;$('la').firstChild.textContent='🎧 '+m.name;
+  ov.style.display='none';ui();rebuild();$('msg').textContent='🏆 '+m.name+(m.desc?' — '+m.desc:'')+' · '+$('msg').textContent}).catch(err=>{$('msg').textContent='⚠ '+err.message;ov.style.display='none'})}
+function renderMaps(ms){$('ovb').innerHTML='';if(!ms.length){$('ovb').textContent='맵을 찾지 못했어요. 맵 폴더마다 mp3, musicxml, json이 있어야 해요.';return}
+ ms.forEach(m=>{const b=document.createElement('button');b.className='map';b.innerHTML='<b></b><small></small>';b.firstChild.textContent=m.name;b.lastChild.textContent=m.desc;b.onclick=()=>loadMap(m);$('ovb').appendChild(b)})}
+function folderPrompt(){
+ $('ovb').innerHTML='<p>같은 위치의 official_map 폴더를 자동으로 찾지 못했어요. 폴더를 직접 선택해 주세요.</p><label class="f">📁 official_map 폴더 선택<input type="file" id="fd" webkitdirectory multiple></label>';
+ $('fd').onchange=e=>{const g={};[...e.target.files].forEach(f=>{const p=(f.webkitRelativePath||f.name).split('/');const k=p.length>1?p[p.length-2]:'';(g[k]=g[k]||[]).push(f)});
+  const ms=[];Object.keys(g).forEach(k=>{const fs=g[k],js=fs.find(f=>/\.json$/i.test(f.name)),mp=fs.find(f=>/\.(mp3|m4a|ogg|wav)$/i.test(f.name)),xm=fs.find(f=>/\.(musicxml|xml)$/i.test(f.name));
+   if(mp&&xm)ms.push({name:k,desc:'',js,mp,xm})});
+  Promise.all(ms.map(async m=>{if(m.js){try{const j=JSON.parse(await m.js.text());m.name=j.name||m.name;m.desc=j.description||''}catch(_){}}m.src=URL.createObjectURL(m.mp);m.xml=()=>m.xm.text()})).then(()=>renderMaps(ms))}}
+$('om').onclick=async()=>{
+ openOv('🏆 공식맵','불러오는 중…');
+ try{const idx=await(await fetch('official_map/maps.json')).json(),ms=[];
+  for(const f of idx){const base='official_map/'+f+'/',info=await(await fetch(base+'info.json')).json();
+   ms.push({name:info.name||f,desc:info.description||'',src:base+(info.audio||'song.mp3'),xml:()=>fetch(base+(info.score||'score.musicxml')).then(r=>{if(!r.ok)throw new Error('악보 파일을 찾을 수 없어요');return r.text()})})}
+  renderMaps(ms)}catch(err){folderPrompt()}};
+$('go').onclick=start;
+</script></body></html>
